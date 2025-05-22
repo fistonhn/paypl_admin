@@ -22,12 +22,16 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const CODES_COLLECTION = 'paypl28';
+const DELETE_PIN = 'F@123456';
 
 function App() {
   const [codes, setCodes] = useState([]);
   const [newCode, setNewCode] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [selectedCodeId, setSelectedCodeId] = useState(null);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
 
-  // Fetch all codes on load
   useEffect(() => {
     fetchCodes();
   }, []);
@@ -45,52 +49,213 @@ function App() {
     if (!newCode.trim()) return;
     await addDoc(collection(db, CODES_COLLECTION), {
       code: newCode.trim(),
-      used: false
+      used: false,
+      devices: []
     });
     setNewCode('');
     fetchCodes();
   };
 
-  const handleDeleteCode = async (id) => {
-    await deleteDoc(doc(db, CODES_COLLECTION, id));
+  const handleDeleteRequest = (id) => {
+    setSelectedCodeId(id);
+    setShowModal(true);
+    setPinInput('');
+    setPinError('');
+  };
+
+  const confirmDelete = async () => {
+    if (pinInput !== DELETE_PIN) {
+      setPinError('Incorrect PIN. Please try again.');
+      return;
+    }
+    await deleteDoc(doc(db, CODES_COLLECTION, selectedCodeId));
+    setShowModal(false);
     fetchCodes();
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1>Admin Code Manager</h1>
+    <div style={styles.container}>
+      <h1 style={styles.header}>🛠️ Activation Code Admin Panel</h1>
 
-      <div style={{ marginBottom: '20px' }}>
+      <div style={styles.addCodeBox}>
         <input
           type="text"
           value={newCode}
           onChange={(e) => setNewCode(e.target.value)}
           placeholder="Enter new code"
-          style={{ padding: '8px', marginRight: '10px' }}
+          style={styles.input}
         />
-        <button onClick={handleAddCode}>Add Code</button>
+        <button onClick={handleAddCode} style={styles.addButton}>
+          ➕ Add Code
+        </button>
       </div>
 
-      <h2>All Activation Codes</h2>
-      {codes.length === 0 ? (
-        <p>No codes yet.</p>
-      ) : (
-        <ul>
-          {codes.map((item) => (
-            <li key={item.id} style={{ marginBottom: '8px' }}>
-              <strong>{item.code}</strong> - Used: {item.used ? 'Yes' : 'No'}
-              <button
-                onClick={() => handleDeleteCode(item.id)}
-                style={{ marginLeft: '10px' }}
-              >
-                Delete
+      <div style={styles.codeList}>
+        {codes.length === 0 ? (
+          <p style={{ textAlign: 'center' }}>No activation codes yet.</p>
+        ) : (
+          codes.map((item) => (
+            <div key={item.id} style={styles.card}>
+              <div style={styles.codeInfo}>
+                <h3 style={styles.codeText}>🔑 Code: {item.code}</h3>
+                <p>✅ Used: <strong>{item.used ? 'Yes' : 'No'}</strong></p>
+              </div>
+
+              <div style={styles.deviceSection}>
+                <h4>📱 Devices:</h4>
+                {item.devices && item.devices.length > 0 ? (
+                  <ul style={styles.deviceList}>
+                    {item.devices.map((device, idx) => (
+                      <li key={idx} style={styles.deviceItem}>
+                        <strong>ID:</strong> {device.id}<br />
+                        <strong>Brand:</strong> {device.brand} <br />
+                        <strong>Model:</strong> {device.modelName} <br />
+                        <strong>OS:</strong> {device.osName} {device.osVersion} <br />
+                        <strong>Activated at:</strong>{' '}
+                        {new Date(device.timestamp).toLocaleString()}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p style={{ marginTop: 5, color: '#888' }}>No devices registered</p>
+                )}
+              </div>
+
+              <button onClick={() => handleDeleteRequest(item.id)} style={styles.deleteButton}>
+                🗑️ Delete
               </button>
-            </li>
-          ))}
-        </ul>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3>Confirm Deletion</h3>
+            <p>Enter admin PIN to confirm deletion:</p>
+            <input
+              type="password"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              style={styles.input}
+              placeholder="Enter PIN"
+            />
+            {pinError && <p style={{ color: 'red' }}>{pinError}</p>}
+            <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
+              <button onClick={confirmDelete} style={styles.addButton}>Confirm</button>
+              <button onClick={() => setShowModal(false)} style={styles.cancelButton}>Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 }
+
+const styles = {
+  container: {
+    padding: '30px',
+    fontFamily: 'Segoe UI, sans-serif',
+    backgroundColor: '#f5f8fa',
+    minHeight: '100vh',
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: '30px',
+    color: '#222',
+  },
+  addCodeBox: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '10px',
+    marginBottom: '30px',
+  },
+  input: {
+    padding: '10px',
+    fontSize: '16px',
+    width: '250px',
+    borderRadius: '5px',
+    border: '1px solid #ccc',
+  },
+  addButton: {
+    padding: '10px 20px',
+    backgroundColor: '#2e7d32',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  cancelButton: {
+    padding: '10px 20px',
+    backgroundColor: '#aaa',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  codeList: {
+    display: 'grid',
+    gap: '20px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: '12px',
+    padding: '20px',
+    boxShadow: '0 3px 8px rgba(0,0,0,0.1)',
+  },
+  codeInfo: {
+    marginBottom: '10px',
+  },
+  codeText: {
+    margin: 0,
+    fontSize: '20px',
+    color: '#333',
+  },
+  deviceSection: {
+    marginTop: '10px',
+    backgroundColor: '#f9f9f9',
+    padding: '10px',
+    borderRadius: '8px',
+  },
+  deviceList: {
+    listStyle: 'none',
+    paddingLeft: 0,
+    margin: 0,
+  },
+  deviceItem: {
+    marginBottom: '10px',
+    paddingBottom: '5px',
+    borderBottom: '1px solid #ddd',
+  },
+  deleteButton: {
+    marginTop: '15px',
+    padding: '8px 12px',
+    backgroundColor: '#c62828',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  modal: {
+    backgroundColor: 'white',
+    padding: '30px',
+    borderRadius: '10px',
+    width: '300px',
+    textAlign: 'center',
+    boxShadow: '0 5px 15px rgba(0,0,0,0.2)',
+  },
+};
 
 export default App;
