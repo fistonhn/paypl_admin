@@ -23,6 +23,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const CODES_COLLECTION = 'paypl28';
 const DELETE_PIN = 'F@123456';
+const ADD_PIN = 'F@123456'; // Same or different as DELETE_PIN
 
 function App() {
   const [codes, setCodes] = useState([]);
@@ -31,6 +32,9 @@ function App() {
   const [selectedCodeId, setSelectedCodeId] = useState(null);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addPinInput, setAddPinInput] = useState('');
+  const [addPinError, setAddPinError] = useState('');
 
   useEffect(() => {
     fetchCodes();
@@ -43,17 +47,6 @@ function App() {
       ...doc.data()
     }));
     setCodes(data);
-  };
-
-  const handleAddCode = async () => {
-    if (!newCode.trim()) return;
-    await addDoc(collection(db, CODES_COLLECTION), {
-      code: newCode.trim(),
-      used: false,
-      devices: []
-    });
-    setNewCode('');
-    fetchCodes();
   };
 
   const handleDeleteRequest = (id) => {
@@ -73,6 +66,26 @@ function App() {
     fetchCodes();
   };
 
+  const confirmAddCode = async () => {
+    if (addPinInput !== ADD_PIN) {
+      setAddPinError('Incorrect PIN. Please try again.');
+      return;
+    }
+
+    if (!newCode.trim()) return;
+
+    await addDoc(collection(db, CODES_COLLECTION), {
+      code: newCode.trim(),
+      used: false,
+      devices: []
+    });
+
+    setNewCode('');
+    setShowAddModal(false);
+    setAddPinInput('');
+    fetchCodes();
+  };
+
   return (
     <div style={styles.container}>
       <h1 style={styles.header}>🛠️ Activation Code Admin Panel</h1>
@@ -85,7 +98,7 @@ function App() {
           placeholder="Enter new code"
           style={styles.input}
         />
-        <button onClick={handleAddCode} style={styles.addButton}>
+        <button onClick={() => setShowAddModal(true)} style={styles.addButton}>
           ➕ Add Code
         </button>
       </div>
@@ -129,7 +142,7 @@ function App() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Delete Modal */}
       {showModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
@@ -146,6 +159,28 @@ function App() {
             <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
               <button onClick={confirmDelete} style={styles.addButton}>Confirm</button>
               <button onClick={() => setShowModal(false)} style={styles.cancelButton}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Code Modal */}
+      {showAddModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3>Confirm New Code</h3>
+            <p>Enter admin PIN to add code:</p>
+            <input
+              type="password"
+              value={addPinInput}
+              onChange={(e) => setAddPinInput(e.target.value)}
+              style={styles.input}
+              placeholder="Enter PIN"
+            />
+            {addPinError && <p style={{ color: 'red' }}>{addPinError}</p>}
+            <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
+              <button onClick={confirmAddCode} style={styles.addButton}>Confirm</button>
+              <button onClick={() => setShowAddModal(false)} style={styles.cancelButton}>Cancel</button>
             </div>
           </div>
         </div>
